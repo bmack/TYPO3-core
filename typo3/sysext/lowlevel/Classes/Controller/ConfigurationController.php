@@ -22,6 +22,7 @@ use TYPO3\CMS\Backend\Routing\Router;
 use TYPO3\CMS\Backend\Template\ModuleTemplate;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Cache\CacheManager;
+use TYPO3\CMS\Core\EventDispatcher\PackageListenerProvider;
 use TYPO3\CMS\Core\Http\HtmlResponse;
 use TYPO3\CMS\Core\Http\MiddlewareStackResolver;
 use TYPO3\CMS\Core\Localization\LanguageService;
@@ -112,6 +113,10 @@ class ConfigurationController
         'siteConfiguration' => [
             'label' => 'siteConfiguration',
             'type' => 'siteConfiguration',
+        ],
+        'eventListeners' => [
+            'label' => 'eventListeners',
+            'type' => 'eventListeners',
         ],
     ];
 
@@ -233,6 +238,16 @@ class ConfigurationController
             }
         } elseif ($selectedTreeDetails['type'] === 'siteConfiguration') {
             $renderArray = GeneralUtility::makeInstance(SiteTcaConfiguration::class)->getTca();
+        } elseif ($selectedTreeDetails['type'] === 'eventListeners') {
+            // Keep the order of the keys
+            $sortKeysByName = false;
+            $listenerProvider = GeneralUtility::makeInstance(
+                PackageListenerProvider::class,
+                GeneralUtility::makeInstance(PackageManager::class),
+                GeneralUtility::makeInstance(CacheManager::class)->getCache('cache_core'),
+                GeneralUtility::makeInstance(DependencyOrderingService::class)
+            );
+            $renderArray = $listenerProvider->getAllListenerDefinitions();
         } else {
             throw new \RuntimeException('Unknown array type "' . $selectedTreeDetails['type'] . '"', 1507845662);
         }

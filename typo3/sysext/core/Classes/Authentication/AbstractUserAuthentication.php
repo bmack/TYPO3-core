@@ -16,6 +16,10 @@ namespace TYPO3\CMS\Core\Authentication;
 
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
+use TYPO3\CMS\Core\Authentication\Event\AfterLogoutEvent;
+use TYPO3\CMS\Core\Authentication\Event\AfterUserLookUpEvent;
+use TYPO3\CMS\Core\Authentication\Event\BeforeLogoutEvent;
+use TYPO3\CMS\Core\Authentication\Event\FailedLoginEvent;
 use TYPO3\CMS\Core\Core\Environment;
 use TYPO3\CMS\Core\Crypto\Random;
 use TYPO3\CMS\Core\Database\Connection;
@@ -27,6 +31,7 @@ use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\QueryRestrictionContainerInterface;
 use TYPO3\CMS\Core\Database\Query\Restriction\RootLevelRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\StartTimeRestriction;
+use TYPO3\CMS\Core\EventDispatcher\EventDispatcher;
 use TYPO3\CMS\Core\Exception;
 use TYPO3\CMS\Core\Session\Backend\Exception\SessionNotFoundException;
 use TYPO3\CMS\Core\Session\Backend\SessionBackendInterface;
@@ -411,13 +416,9 @@ abstract class AbstractUserAuthentication implements LoggerAwareInterface
         if (!$this->dontSetCookie) {
             $this->setSessionCookie();
         }
-        // Hook for alternative ways of filling the $this->user array (is used by the "timtaw" extension)
-        foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauth.php']['postUserLookUp'] ?? [] as $funcName) {
-            $_params = [
-                'pObj' => $this,
-            ];
-            GeneralUtility::callUserFunction($funcName, $_params, $this);
-        }
+
+        $dispatcher = GeneralUtility::makeInstance(EventDispatcher::class);
+        $dispatcher->dispatch(new AfterUserLookUpEvent($this));
         // Set $this->gc_time if not explicitly specified
         if ($this->gc_time === 0) {
             // Default to 86400 seconds (1 day) if $this->sessionTimeout is 0
@@ -816,17 +817,12 @@ abstract class AbstractUserAuthentication implements LoggerAwareInterface
                 ]
             );
 
-            // Hook to implement login failure tracking methods
-            $_params = [];
-            $sleep = true;
-            foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauth.php']['postLoginFailureProcessing'] ?? [] as $_funcRef) {
-                GeneralUtility::callUserFunction($_funcRef, $_params, $this);
-                $sleep = false;
-            }
-
-            if ($sleep) {
-                // No hooks were triggered - default login failure behavior is to sleep 5 seconds
-                sleep(5);
+            $dispatcher = GeneralUtility::makeInstance(EventDispatcher::class);
+            /** @var FailedLoginEvent $evt */
+            $evt = new FailedLoginEvent($this);
+            $evt = $dispatcher->dispatch($evt);
+            if ($evt->getSleepTime()) {
+                sleep($evt->getSleepTime());
             }
 
             $this->checkLogFailures($this->warningEmail, $this->warningPeriod, $this->warningMax);
@@ -1017,21 +1013,13 @@ abstract class AbstractUserAuthentication implements LoggerAwareInterface
     {
         $this->logger->debug('logoff: ses_id = ' . $this->id);
 
-        $_params = [];
-        foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauth.php']['logoff_pre_processing'] ?? [] as $_funcRef) {
-            if ($_funcRef) {
-                GeneralUtility::callUserFunction($_funcRef, $_params, $this);
-            }
-        }
+        $dispatcher = GeneralUtility::makeInstance(EventDispatcher::class);
+        $dispatcher->dispatch(new BeforeLogoutEvent($this));
+
         $this->performLogoff();
 
-        foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauth.php']['logoff_post_processing'] ?? [] as $_funcRef) {
-            if ($_funcRef) {
-                GeneralUtility::callUserFunction($_funcRef, $_params, $this);
-            }
-        }
+        $dispatcher->dispatch(new AfterLogoutEvent($this));
     }
-
     /**
      * Perform the logoff action. Called from logoff() as a way to allow subclasses to override
      * what happens when a user logs off, without needing to reproduce the hook calls and logging

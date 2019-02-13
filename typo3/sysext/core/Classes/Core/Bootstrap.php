@@ -28,6 +28,8 @@ use TYPO3\CMS\Core\Cache\Exception\InvalidCacheException;
 use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
 use TYPO3\CMS\Core\Cache\Frontend\VariableFrontend;
 use TYPO3\CMS\Core\Configuration\ConfigurationManager;
+use TYPO3\CMS\Core\EventDispatcher\EventDispatcher;
+use TYPO3\CMS\Core\EventDispatcher\PackageListenerProvider;
 use TYPO3\CMS\Core\Imaging\IconRegistry;
 use TYPO3\CMS\Core\IO\PharStreamWrapperInterceptor;
 use TYPO3\CMS\Core\Localization\Locales;
@@ -35,6 +37,7 @@ use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Package\FailsafePackageManager;
 use TYPO3\CMS\Core\Package\PackageManager;
 use TYPO3\CMS\Core\Page\PageRenderer;
+use TYPO3\CMS\Core\Service\DependencyOrderingService;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\PharStreamWrapper\Behavior;
@@ -122,6 +125,12 @@ class Bootstrap
         $cacheManager = static::createCacheManager($disableCaching, [$coreCache, $assetsCache]);
         GeneralUtility::setSingletonInstance(CacheManager::class, $cacheManager);
 
+        // Create the global EventDispatcher singleton instance
+        $eventDispatcher = new EventDispatcher(
+            new PackageListenerProvider($packageManager, $coreCache, new DependencyOrderingService())
+        );
+        GeneralUtility::setSingletonInstance(EventDispatcher::class, $eventDispatcher);
+
         $defaultContainerEntries = [
             ClassLoader::class => $classLoader,
             'request.id' => $requestId,
@@ -132,6 +141,7 @@ class Bootstrap
             CacheManager::class => $cacheManager,
             PackageManager::class => $packageManager,
             Locales::class => $locales,
+            EventDispatcher::class => $eventDispatcher
         ];
 
         return new class($defaultContainerEntries) implements ContainerInterface {
