@@ -29,6 +29,7 @@ use TYPO3\CMS\Core\Domain\Repository\PageRepository;
 use TYPO3\CMS\Core\Error\Http\ShortcutTargetPageNotFoundException;
 use TYPO3\CMS\Core\Error\Http\StatusException;
 use TYPO3\CMS\Core\Exception\Page\RootLineException;
+use TYPO3\CMS\Core\Page\PageLayoutResolver;
 use TYPO3\CMS\Core\Type\Bitmask\PageTranslationVisibility;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\TypoScript\IncludeTree\SysTemplateRepository;
@@ -67,6 +68,7 @@ final readonly class PageInformationFactory
         private RecordAccessVoter $accessVoter,
         private ErrorController $errorController,
         private SysTemplateRepository $sysTemplateRepository,
+        private PageLayoutResolver $pageLayoutResolver
     ) {}
 
     /**
@@ -108,6 +110,15 @@ final readonly class PageInformationFactory
         $pageInformation = $this->settingLanguage($request, $pageInformation);
         $pageInformation = $this->setContentFromPid($request, $pageInformation);
         $this->checkBackendUserAccess($request, $pageInformation);
+
+        // resolve the page layout
+        $pageLayout = $this->pageLayoutResolver->getLayoutForPage(
+            $pageInformation->getPageRecord(),
+            $pageInformation->getRootLine()
+        );
+        if ($pageLayout) {
+            $pageInformation->setPageLayout($pageLayout);
+        }
 
         $event = $this->eventDispatcher->dispatch(new AfterPageAndLanguageIsResolvedEvent($request, $pageInformation));
         if ($event->getResponse()) {

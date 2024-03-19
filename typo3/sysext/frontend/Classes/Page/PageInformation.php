@@ -17,6 +17,8 @@ declare(strict_types=1);
 
 namespace TYPO3\CMS\Frontend\Page;
 
+use TYPO3\CMS\Core\Page\PageLayout;
+
 /**
  * This DTO carries various Frontend rendering related page information. It is
  * set up by a Frontend middleware and attached to as 'frontend.page.information'
@@ -30,6 +32,7 @@ final class PageInformation
     private array $pageRecord;
     private string $mountPoint = '';
     private int $contentFromPid;
+    private ?PageLayout $pageLayout = null;
 
     /**
      * Gets set when we are processing a page of type shortcut in the early stages
@@ -230,5 +233,15 @@ final class PageInformation
     public function getContentFromPid(): int
     {
         return $this->contentFromPid;
+    }
+
+    public function setPageLayout(PageLayout $pageLayout): void
+    {
+        $this->pageLayout = $pageLayout;
+    }
+
+    public function getPageLayout(): ?PageLayout
+    {
+        return $this->pageLayout;
     }
 }
