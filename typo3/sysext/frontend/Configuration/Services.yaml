@@ -188,3 +188,7 @@ services:
   TYPO3\CMS\Frontend\DataProcessing\SplitProcessor:
     tags:
       - { name: 'data.processor', identifier: 'split' }
+
+  TYPO3\CMS\Frontend\DataProcessing\ContentFetchingProcessor:
+    tags:
+      - { name: 'data.processor', identifier: 'content' }
