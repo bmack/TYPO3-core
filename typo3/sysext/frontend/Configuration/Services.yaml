@@ -192,3 +192,7 @@ services:
   TYPO3\CMS\Frontend\DataProcessing\ContentFetchingProcessor:
     tags:
       - { name: 'data.processor', identifier: 'content' }
+
+  TYPO3\CMS\Frontend\DataProcessing\PageContentFetchingProcessor:
+    tags:
+      - { name: 'data.processor', identifier: 'pageContent' }
