@@ -17,6 +17,7 @@ declare(strict_types=1);
 
 namespace TYPO3\CMS\Fluid\ViewHelpers;
 
+use TYPO3\CMS\Core\Domain\Record;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Fluid\View\StandaloneView;
 use TYPO3Fluid\Fluid\Core\Rendering\RenderingContextInterface;
@@ -25,6 +26,9 @@ use TYPO3Fluid\Fluid\Core\ViewHelper\Exception;
 use TYPO3Fluid\Fluid\Core\ViewHelper\Traits\CompileWithRenderStatic;
 use TYPO3Fluid\Fluid\View\Exception\InvalidTemplateResourceException;
 
+/**
+ * ViewHelper to render a block
+ */
 final class RenderBlockViewHelper extends AbstractViewHelper
 {
     use CompileWithRenderStatic;
@@ -37,9 +41,7 @@ final class RenderBlockViewHelper extends AbstractViewHelper
     public function initializeArguments(): void
     {
         parent::initializeArguments();
-        $this->registerArgument('name', 'string', 'Block to render', true);
-        $this->registerArgument('data', 'array', 'Block data', false, []);
-        $this->registerArgument('type', 'string', 'Block Type', false, 'Content');
+        $this->registerArgument('data', Record::class, 'Block data', false, []);
     }
 
     /**
@@ -47,9 +49,8 @@ final class RenderBlockViewHelper extends AbstractViewHelper
      */
     public static function renderStatic(array $arguments, \Closure $renderChildrenClosure, RenderingContextInterface $renderingContext)
     {
-        $blockName = $arguments['name'] ?? null;
-        $blockType = $arguments['type'];
         $data = $arguments['data'];
+
 
         $view = $renderingContext->getViewHelperVariableContainer()->getView();
         if (!$view) {
@@ -58,27 +59,27 @@ final class RenderBlockViewHelper extends AbstractViewHelper
                 'a reference to the View. Normally this is taken care of by the TemplateView, so most likely this ' .
                 'error is because you overrode AbstractTemplateView->initializeRenderingContext() and did not call ' .
                 '$renderingContext->getViewHelperVariableContainer()->setView($this) or parent::initializeRenderingContext. ' .
-                'This is an issue you must fix in your code as f:render is fully unable to render anything without a View.'
+                'This is an issue you must fix in your code as f:renderBlock is fully unable to render anything without a View.'
             );
         }
         $subView = GeneralUtility::makeInstance(StandaloneView::class);
         $r = clone $view->getRenderingContext();
         $subView->setRequest($renderingContext->getRequest());
         $subView->getRenderingContext()->setTemplatePaths($r->getTemplatePaths());
-        $subView->setTemplate(GeneralUtility::underscoredToUpperCamelCase($blockType) . '/' . GeneralUtility::underscoredToUpperCamelCase($blockName));
+        $subView->setTemplate(str_replace('.', '/', $data->getFullType()));
         // @todo: consider using the same variables
-        $subView->assignMultiple($data);
+        $subView->assign('record', $data);
         try {
             $content = $subView->render();
         } catch (InvalidTemplateResourceException) {
-            // Render via TypoScript
+            // Render via TypoScript as fallback
             /** @var CObjectViewHelper $cObjectViewHelper */
             $cObjectViewHelper = $view->getViewHelperResolver()->createViewHelperInstance('f', 'cObject');
-            if ($blockType === 'Content') {
-                $blockType = 'tt_content';
+            $blockType = GeneralUtility::camelCaseToLowerCaseUnderscored($data->getFullType());
+            if (str_starts_with($blockType, 'content')) {
+                $blockType = 'tt_' . $blockType;
             }
-            $typoScriptPath = GeneralUtility::camelCaseToLowerCaseUnderscored($blockType) . '.' . GeneralUtility::camelCaseToLowerCaseUnderscored($blockName);
-            $cObjectViewHelper->setArguments(['typoscriptObjectPath' => $typoScriptPath, 'data' => $data]);
+            $cObjectViewHelper->setArguments(['typoscriptObjectPath' => $blockType, 'data' => $data->getRawProperties()]);
             $cObjectViewHelper->setRenderingContext($subView->getRenderingContext());
             $content = $cObjectViewHelper->render();
         }

@@ -17,17 +17,19 @@ declare(strict_types=1);
 
 namespace TYPO3\CMS\Frontend\Content;
 
+use TYPO3\CMS\Core\Domain\RecordFactory;
 use TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer;
 
 class ContentCollector
 {
+    public function __construct(protected readonly RecordFactory $recordFactory) {}
+
     public function collect(
         ContentObjectRenderer $contentObjectRenderer,
         string $table,
         array $select,
         ContentSlideMode $slideMode = ContentSlideMode::None
-    ): array
-    {
+    ): array {
         $slideCollectReverse = false;
         $collect = false;
         switch ($slideMode) {
@@ -51,6 +53,12 @@ class ContentCollector
 
         do {
             $recordsOnPid = $contentObjectRenderer->getRecords($table, $select);
+            $recordsOnPid = array_map(
+                function ($record) use ($table) {
+                    return $this->recordFactory->createFromDatabaseRecord($table, $record);
+                },
+                $recordsOnPid
+            );
 
             if ($slideCollectReverse) {
                 $totalRecords = array_merge($totalRecords, $recordsOnPid);
@@ -58,7 +66,7 @@ class ContentCollector
                 $totalRecords = array_merge($recordsOnPid, $totalRecords);
             }
             if ($slide) {
-                $select['pidInList'] = $contentObjectRenderer->getSlidePids($select['pidInList'] ?? '', $select['pidInList.'] ?? [],);
+                $select['pidInList'] = $contentObjectRenderer->getSlidePids($select['pidInList'] ?? '', $select['pidInList.'] ?? []);
                 if (isset($select['pidInList.'])) {
                     unset($select['pidInList.']);
                 }

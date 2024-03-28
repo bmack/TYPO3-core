@@ -17,7 +17,6 @@ declare(strict_types=1);
 
 namespace TYPO3\CMS\Frontend\DataProcessing;
 
-
 use TYPO3\CMS\Frontend\Content\ContentCollector;
 use TYPO3\CMS\Frontend\Content\ContentSlideMode;
 use TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer;
